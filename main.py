@@ -3,6 +3,7 @@ from telebot import types
 from flask import Flask
 from threading import Thread
 import os
+import re 
 
 # --- CONFIGURAÇÃO DO SERVIDOR FALSO (PARA O RENDER) ---
 app = Flask('')
@@ -12,14 +13,14 @@ def home():
     return "Estou vivo! O Bot está rodando."
 
 def run():
-  app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080)
 
 def keep_alive():
     t = Thread(target=run)
     t.start()
 
 # --- CONFIGURAÇÕES DO BOT ---
-TOKEN = '8316409069:AAHpUmJCQJvKxwOV7QA_uiaFPuP5wxEjVsQ'  # <--- COLOQUE O TOKEN AQUI
+TOKEN = '8316409069:AAHpUmJCQJvKxwOV7QA_uiaFPuP5wxEjVsQ'  # <--- SEU TOKEN
 BOT = telebot.TeleBot(TOKEN)
 
 # Informações de Pagamento
@@ -41,7 +42,7 @@ PRODUCTS = {
         'label': '💵 $51.99 (2500 ⭐)', 
         'price': 2500, 
         'usd': '$51.99',
-        'delivery': 'vg'
+        'delivery': 'https://mega.nz/folder/nQ0USC4J#-aeGDupNTy_vgQCgX4jZFg'
     },
     'p_diamond': {
         'name': '💎 DIAMOND PACKAGE', 
@@ -57,7 +58,7 @@ PRODUCTS = {
 def menu(message):
     markup = types.InlineKeyboardMarkup(row_width=1)
     for key, p in PRODUCTS.items():
-        btn = types.InlineKeyboardButton(f"{p['name']} - {p['label']}", callback_data=f"select_{key}")
+        btn = types.InlineKeyboardButton(f"{p['name']} - {p['usd']}", callback_data=f"select_{key}")
         markup.add(btn)
     
     welcome = "✨ **PREMIUM VIDEO STORE** ✨\n\nSelect your package below:"
@@ -119,45 +120,77 @@ def handle_receipt(message):
     
     user = message.from_user
     username = f"@{user.username}" if user.username else "Sem User"
-    admin_msg = (f"🆕 **NOVO COMPROVANTE!**\n👤 De: {user.first_name} ({username})\n🆔 ID: `{user.id}`\n\n"
-                 f"Responda à foto com:\n`/liberar_bronze`\n`/liberar_silver`\n`/liberar_diamond`")
+    
+    # Mensagem para o Admin com os comandos de APROVAR ou REJEITAR
+    admin_msg = (f"🆕 <b>NOVO COMPROVANTE!</b>\n"
+                 f"👤 De: {user.first_name} ({username})\n"
+                 f"🆔 ID: <code>{user.id}</code>\n\n"
+                 f"⚠️ <b>Responda A ESTA MENSAGEM com:</b>\n"
+                 f"✅ <code>/liberar_bronze</code>\n"
+                 f"✅ <code>/liberar_silver</code>\n"
+                 f"✅ <code>/liberar_diamond</code>\n"
+                 f"❌ <code>/rejeitar</code>")
     try:
         BOT.forward_message(ADMIN_ID, message.chat.id, message.message_id)
-        BOT.send_message(ADMIN_ID, admin_msg, parse_mode="Markdown")
+        BOT.send_message(ADMIN_ID, admin_msg, parse_mode="HTML")
     except Exception as e:
         print(f"Erro admin: {e}")
 
-# --- COMANDOS ADMIN ---
-@BOT.message_handler(commands=['liberar_bronze', 'liberar_silver', 'liberar_diamond'])
-def manual_approve(message):
+# --- DECISÃO DO ADMIN (APROVAR OU REJEITAR) ---
+@BOT.message_handler(commands=['liberar_bronze', 'liberar_silver', 'liberar_diamond', 'rejeitar'])
+def admin_decision(message):
     if message.from_user.id != ADMIN_ID: return
+    
     if not message.reply_to_message:
-        return BOT.reply_to(message, "❌ Responda à foto encaminhada.")
+        return BOT.reply_to(message, "❌ Responda à MENSAGEM DE TEXTO do bot que contém o ID.")
 
     try:
-        if message.reply_to_message.forward_from:
-            original_user_id = message.reply_to_message.forward_from.id
+        # Pega o ID do usuário original de dentro do texto da mensagem do bot
+        text_original = message.reply_to_message.text or message.reply_to_message.caption or ""
+        match = re.search(r"ID:\s*(\d+)", text_original)
+        
+        if match:
+            original_user_id = int(match.group(1))
         else:
-            BOT.reply_to(message, "❌ ID oculto. Envie manualmente.")
+            return BOT.reply_to(message, "❌ Não achei o ID na mensagem. Responda à mensagem de texto com os dados do usuário.")
+
+        command = message.text.split()[0] # Pega o comando (ex: /rejeitar)
+
+        # --- LÓGICA DE REJEIÇÃO ---
+        if "/rejeitar" in command:
+            BOT.send_message(original_user_id, "❌ **Payment Rejected.**\n\nWe could not verify your payment or the amount is incorrect.\nPlease contact support if you think this is an error.", parse_mode="Markdown")
+            BOT.reply_to(message, "🚫 **Comprovante Rejeitado.** O usuário foi notificado.")
             return
 
-        cmd = message.text.split('_')[1]
-        p_key = f"p_{cmd}"
+        # --- LÓGICA DE APROVAÇÃO ---
+        cmd_type = command.split('_')[1] # pega 'bronze', 'silver' etc
+        p_key = f"p_{cmd_type}"
         
         if p_key in PRODUCTS:
-            link = PRODUCTS[p_key]['delivery']
-            BOT.send_message(original_user_id, f"✅ **Payment Approved!**\nPackage: {PRODUCTS[p_key]['name']}\n\nLink:\n{link}", parse_mode="Markdown")
-            BOT.reply_to(message, f"✅ Liberado para ID `{original_user_id}`.")
+            pkg = PRODUCTS[p_key]
+            BOT.send_message(original_user_id, f"✅ **Payment Approved!**\nPackage: {pkg['name']}\n\nLink:\n{pkg['delivery']}", parse_mode="Markdown")
+            BOT.reply_to(message, f"✅ Liberado **{pkg['name']}** para ID `{original_user_id}`.", parse_mode="Markdown")
+        else:
+            BOT.reply_to(message, "❌ Pacote não encontrado no sistema.")
+            
     except Exception as e:
-        BOT.reply_to(message, f"❌ Erro: {e}")
+        BOT.reply_to(message, f"❌ Erro ao processar: {e}")
 
-# --- STARS ---
+# --- STARS (PAGAMENTO AUTOMÁTICO) ---
 @BOT.callback_query_handler(func=lambda call: call.data.startswith('stars_'))
 def pay_stars(call):
     try:
         product_key = call.data.replace('stars_', '')
         p = PRODUCTS[product_key]
-        BOT.send_invoice(call.message.chat.id, title=f"{p['name']}", description="Instant Access", invoice_payload=product_key, provider_token="", currency="XTR", prices=[types.LabeledPrice(label=p['name'], amount=p['price'])])
+        BOT.send_invoice(
+            chat_id=call.message.chat.id, 
+            title=p['name'], 
+            description="Instant Access", 
+            invoice_payload=product_key, 
+            provider_token="", 
+            currency="XTR", 
+            prices=[types.LabeledPrice(label=p['name'], amount=p['price'])]
+        )
     except: pass
 
 @BOT.pre_checkout_query_handler(func=lambda query: True)
@@ -170,9 +203,10 @@ def got_payment(message):
         payload = message.successful_payment.invoice_payload
         if payload in PRODUCTS:
             BOT.send_message(message.chat.id, f"🎉 **PAYMENT CONFIRMED!**\n🚀 Link: {PRODUCTS[payload]['delivery']}", parse_mode="Markdown")
+            BOT.send_message(ADMIN_ID, f"💰 **Venda Automática (Stars)!**\nPacote: {PRODUCTS[payload]['name']}\nUser: {message.from_user.first_name}")
     except: pass
 
-# --- INICIALIZAÇÃO COM SERVIDOR ---
-print("Bot iniciando com servidor web...")
-keep_alive() # <--- Inicia o servidor falso em segundo plano
-BOT.infinity_polling() # <--- Inicia o bot
+# --- INICIALIZAÇÃO ---
+print("Bot iniciando...")
+keep_alive()
+BOT.infinity_polling()
