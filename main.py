@@ -41,7 +41,7 @@ PRODUCTS = {
         'label': '💵 $51.99 (2500 ⭐)', 
         'price': 2500, 
         'usd': '$51.99',
-        'delivery': 'https://mega.nz/folder/nQ0USC4J#-aeGDupNTy_vgQCgX4jZFg'
+        'delivery': 'vg'
     },
     'p_diamond': {
         'name': '💎 DIAMOND PACKAGE', 
