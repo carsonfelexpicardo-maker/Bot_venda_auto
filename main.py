@@ -206,7 +206,22 @@ def got_payment(message):
             BOT.send_message(ADMIN_ID, f"💰 **Venda Automática (Stars)!**\nPacote: {PRODUCTS[payload]['name']}\nUser: {message.from_user.first_name}")
     except: pass
 
-# --- INICIALIZAÇÃO ---
-print("Bot iniciando...")
-keep_alive()
-BOT.infinity_polling()
+# --- INICIALIZAÇÃO SEGURA ---
+if __name__ == "__main__":
+    print("Bot iniciando...")
+    keep_alive() # Inicia o servidor web Flask
+    
+    # Esta parte limpa conexões presas que causam o erro 409 Conflict
+    try:
+        BOT.remove_webhook()
+        import time
+        time.sleep(1) 
+        print("Webhook removido com sucesso.")
+    except Exception as e:
+        print(f"Erro ao remover webhook: {e}")
+
+    # O skip_pending=True ignora mensagens enviadas enquanto o bot estava offline
+    # Isso evita que o bot "exploda" tentando processar tudo de uma vez ao ligar
+    print("Bot em execução!")
+    BOT.infinity_polling(skip_pending=True)
+
