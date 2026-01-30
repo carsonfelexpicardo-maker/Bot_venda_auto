@@ -33,22 +33,22 @@ PRODUCTS = {
         'name': '🥉 BRONZE PACKAGE', 
         'label': '💵 $32.99 (1500 ⭐)', 
         'price': 1500, 
-        'usd': '$30.00',
-        'delivery': 'LINK_DO_VIDEO_BRONZE_AQUI'
+        'usd': '$32.99',
+        'delivery': 'https://mega.nz/folder/PBdQwCTZ#1TAr86RRtZQD59pTH91TXQ'
     },
     'p_silver': {
         'name': '🥈 SILVER PACKAGE', 
         'label': '💵 $51.99 (2500 ⭐)', 
         'price': 2500, 
-        'usd': '$50.00',
-        'delivery': 'LINK_DO_VIDEO_SILVER_AQUI'
+        'usd': '$51.99',
+        'delivery': 'https://mega.nz/folder/nQ0USC4J#-aeGDupNTy_vgQCgX4jZFg'
     },
     'p_diamond': {
         'name': '💎 DIAMOND PACKAGE', 
         'label': '💵 $99.99 (5000 ⭐)', 
         'price': 5000, 
-        'usd': '$100.00',
-        'delivery': 'LINK_DO_VIDEO_DIAMOND_AQUI'
+        'usd': '$99.99',
+        'delivery': 'https://mega.nz/folder/DF8CTJpa#8sHiABdYvYAX5xWzsAyRnw'
     }
 }
 
