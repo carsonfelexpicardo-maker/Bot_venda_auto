@@ -20,7 +20,7 @@ def keep_alive():
     t.start()
 
 # --- CONFIGURAÇÕES DO BOT ---
-TOKEN = '8316409069:AAHpUmJCQJvKxwOV7QA_uiaFPuP5wxEjVsQ'  # <--- SEU TOKEN
+TOKEN = '8316409069:AAFwMVesRk6ja_ME540Jlg5-ROawuzpZujg'  # <--- SEU TOKEN
 BOT = telebot.TeleBot(TOKEN)
 
 # Informações de Pagamento
