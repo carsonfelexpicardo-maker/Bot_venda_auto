@@ -9,7 +9,7 @@ All messages are in **English**.
 
 ## 1️⃣ Files
 
-- `bot.py` → The main bot code
+- `main.py` → The main bot code
 - `requirements.txt` → Python dependencies
 - `README.md` → This guide
 
