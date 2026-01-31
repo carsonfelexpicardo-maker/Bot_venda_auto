@@ -3,50 +3,47 @@ from telebot import types
 from flask import Flask
 from threading import Thread
 import os
-import re 
+import re
+import time
 
-# --- CONFIGURAÇÃO DO SERVIDOR FALSO (PARA O RENDER) ---
+# --- CONFIGURAÇÃO DO SERVIDOR (PARA O RENDER) ---
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "Estou vivo! O Bot está rodando."
+    return "Bot Online e Conectado!"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
 
 def keep_alive():
     t = Thread(target=run)
+    t.setDaemon(True)
     t.start()
 
 # --- CONFIGURAÇÕES DO BOT ---
-TOKEN = '8316409069:AAFwMVesRk6ja_ME540Jlg5-ROawuzpZujg'  # <--- SEU TOKEN
+TOKEN = '8316409069:AAFwMVesRk6ja_ME540Jlg5-ROawuzpZujg'
 BOT = telebot.TeleBot(TOKEN)
 
-# Informações de Pagamento
 EMAIL_PAYPAL = "rivaldomaurinholuis3@gmail.com"
 CARTEIRA_USDT = "0x7bbf369df5a2c12dbcac4d9768703d318d74b491"
 ADMIN_ID = 6953777986
 
-# Definição dos pacotes
 PRODUCTS = {
     'p_bronze': {
         'name': '🥉 BRONZE PACKAGE', 
-        'label': '💵 $32.99 (1500 ⭐)', 
         'price': 1500, 
         'usd': '$32.99',
         'delivery': 'https://mega.nz/folder/PBdQwCTZ#1TAr86RRtZQD59pTH91TXQ'
     },
     'p_silver': {
         'name': '🥈 SILVER PACKAGE', 
-        'label': '💵 $51.99 (2500 ⭐)', 
         'price': 2500, 
         'usd': '$51.99',
         'delivery': 'https://mega.nz/folder/nQ0USC4J#-aeGDupNTy_vgQCgX4jZFg'
     },
     'p_diamond': {
         'name': '💎 DIAMOND PACKAGE', 
-        'label': '💵 $99.99 (5000 ⭐)', 
         'price': 5000, 
         'usd': '$99.99',
         'delivery': 'https://mega.nz/folder/DF8CTJpa#8sHiABdYvYAX5xWzsAyRnw'
@@ -61,123 +58,112 @@ def menu(message):
         btn = types.InlineKeyboardButton(f"{p['name']} - {p['usd']}", callback_data=f"select_{key}")
         markup.add(btn)
     
-    welcome = "✨ **PREMIUM VIDEO STORE** ✨\n\nSelect your package below:"
-    BOT.send_message(message.chat.id, welcome, reply_markup=markup, parse_mode="Markdown")
+    welcome = "✨ <b>PREMIUM VIDEO STORE</b> ✨\n\nSelect your package below:"
+    BOT.send_message(message.chat.id, welcome, reply_markup=markup, parse_mode="HTML")
 
 # --- ESCOLHA DO MÉTODO ---
 @BOT.callback_query_handler(func=lambda call: call.data.startswith('select_'))
 def choose_method(call):
     try:
         product_key = call.data.replace('select_', '')
-        if product_key not in PRODUCTS: return
-
         p = PRODUCTS[product_key]
         
         markup = types.InlineKeyboardMarkup(row_width=1)
-        btn_stars = types.InlineKeyboardButton("⭐ Telegram Stars (Instant)", callback_data=f"stars_{product_key}")
-        btn_paypal = types.InlineKeyboardButton("💳 PayPal (Manual Review)", callback_data=f"paypal_{product_key}")
-        btn_crypto = types.InlineKeyboardButton("🔗 USDT - BEP20 (Manual Review)", callback_data=f"crypto_{product_key}")
-        btn_back = types.InlineKeyboardButton("« Back", callback_data="back_to_main")
-        markup.add(btn_stars, btn_paypal, btn_crypto, btn_back)
+        markup.add(
+            types.InlineKeyboardButton("⭐ Telegram Stars (Instant)", callback_data=f"stars_{product_key}"),
+            types.InlineKeyboardButton("💳 PayPal (Manual Review)", callback_data=f"paypal_{product_key}"),
+            types.InlineKeyboardButton("🔗 USDT - BEP20 (Manual Review)", callback_data=f"crypto_{product_key}"),
+            types.InlineKeyboardButton("« Back", callback_data="back_to_main")
+        )
         
-        text = f"📦 **{p['name']}**\n💰 **Value:** {p['usd']}\n\nChoose payment method:"
-        BOT.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
-    except Exception as e:
-        print(f"Erro no menu: {e}")
+        text = f"📦 <b>{p['name']}</b>\n💰 <b>Value:</b> {p['usd']}\n\nChoose payment method:"
+        BOT.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="HTML")
+    except: pass
 
 @BOT.callback_query_handler(func=lambda call: call.data == "back_to_main")
 def back_main(call):
-    try: BOT.delete_message(call.message.chat.id, call.message.message_id)
-    except: pass
     menu(call.message)
 
 # --- MÉTODOS MANUAIS ---
-@BOT.callback_query_handler(func=lambda call: call.data.startswith('paypal_') or call.data.startswith('crypto_'))
+@BOT.callback_query_handler(func=lambda call: call.data.startswith(('paypal_', 'crypto_')))
 def manual_pay(call):
     try:
         if "paypal_" in call.data:
-            product_key = call.data.replace('paypal_', '')
-            p = PRODUCTS[product_key]
-            msg = f"💳 **PAYPAL PAYMENT**\n\nAmount: **{p['usd']}**\nEmail: `{EMAIL_PAYPAL}`"
+            p = PRODUCTS[call.data.replace('paypal_', '')]
+            msg = f"💳 <b>PAYPAL PAYMENT</b>\n\nAmount: <b>{p['usd']}</b>\nEmail: <code>{EMAIL_PAYPAL}</code>"
         else:
-            product_key = call.data.replace('crypto_', '')
-            p = PRODUCTS[product_key]
-            msg = f"🔗 **USDT PAYMENT (BEP20)**\n\nAmount: **{p['usd']} USDT**\nNetwork: **BEP20**\nAddress: `{CARTEIRA_USDT}`"
+            p = PRODUCTS[call.data.replace('crypto_', '')]
+            msg = f"🔗 <b>USDT PAYMENT (BEP20)</b>\n\nAmount: <b>{p['usd']} USDT</b>\nAddress: <code>{CARTEIRA_USDT}</code>"
         
-        instructions = f"{msg}\n\n⚠️ Send the payment and then **send the screenshot (photo)** here in this chat."
-        
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("« Back", callback_data=f"select_{product_key}"))
-        
-        BOT.edit_message_text(instructions, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode="Markdown")
-    except Exception as e:
-        print(f"Erro manual: {e}")
+        BOT.edit_message_text(f"{msg}\n\n⚠️ Send the screenshot of payment here.", call.message.chat.id, call.message.message_id, parse_mode="HTML")
+    except: pass
 
 # --- RECEBIMENTO DO COMPROVANTE ---
 @BOT.message_handler(content_types=['photo'])
 def handle_receipt(message):
-    BOT.reply_to(message, "🎯 **Receipt Received!** We are reviewing it.")
+    BOT.reply_to(message, "🎯 <b>Receipt Received!</b> We are reviewing it.", parse_mode="HTML")
     
     user = message.from_user
-    username = f"@{user.username}" if user.username else "Sem User"
+    username = f"@{user.username}" if user.username else "N/A"
     
-    # Mensagem para o Admin com os comandos de APROVAR ou REJEITAR
     admin_msg = (f"🆕 <b>NOVO COMPROVANTE!</b>\n"
                  f"👤 De: {user.first_name} ({username})\n"
                  f"🆔 ID: <code>{user.id}</code>\n\n"
-                 f"⚠️ <b>Responda A ESTA MENSAGEM com:</b>\n"
-                 f"✅ <code>/liberar_bronze</code>\n"
-                 f"✅ <code>/liberar_silver</code>\n"
-                 f"✅ <code>/liberar_diamond</code>\n"
-                 f"❌ <code>/rejeitar</code>")
-    try:
-        BOT.forward_message(ADMIN_ID, message.chat.id, message.message_id)
-        BOT.send_message(ADMIN_ID, admin_msg, parse_mode="HTML")
-    except Exception as e:
-        print(f"Erro admin: {e}")
+                 f"⚠️ Responda A ESTA MENSAGEM com:\n"
+                 f"/liberar_bronze\n"
+                 f"/liberar_silver\n"
+                 f"/liberar_diamond\n"
+                 f"/rejeitar")
+    
+    BOT.forward_message(ADMIN_ID, message.chat.id, message.message_id)
+    BOT.send_message(ADMIN_ID, admin_msg, parse_mode="HTML")
 
-# --- DECISÃO DO ADMIN (CORRIGIDO PARA EVITAR ERRO DE ENTIDADES) ---
+# --- DECISÃO DO ADMIN (CORREÇÃO DE ERRO 400 E REJEIÇÃO) ---
 @BOT.message_handler(commands=['liberar_bronze', 'liberar_silver', 'liberar_diamond', 'rejeitar'])
 def admin_decision(message):
     if message.from_user.id != ADMIN_ID: return
-    
-    if not message.reply_to_message:
-        return BOT.reply_to(message, "❌ Responda à MENSAGEM DE TEXTO do bot que contém o ID.")
+    if not message.reply_to_message: return
 
     try:
-        # Pega o ID do usuário original de dentro do texto da mensagem do bot
-        text_original = message.reply_to_message.text or message.reply_to_message.caption or ""
-        match = re.search(r"ID:\s*(\d+)", text_original)
+        text_orig = message.reply_to_message.text or ""
+        match = re.search(r"ID:\s*(\d+)", text_orig)
+        if not match: return
         
-        if match:
-            original_user_id = int(match.group(1))
-        else:
-            return BOT.reply_to(message, "❌ Não achei o ID na mensagem. Responda à mensagem de texto correta.")
+        target_id = int(match.group(1))
+        cmd = message.text.split()[0]
 
-        command = message.text.split()[0]
+        if "/rejeitar" in cmd:
+            BOT.send_message(target_id, "❌ <b>Payment Rejected.</b> Invalid receipt.", parse_mode="HTML")
+            return BOT.reply_to(message, "🚫 Rejeitado.")
 
-        # --- LÓGICA DE REJEIÇÃO ---
-        if "/rejeitar" in command:
-            BOT.send_message(original_user_id, "❌ <b>Payment Rejected.</b>\n\nWe could not verify your payment. Please contact support.", parse_mode="HTML")
-            BOT.reply_to(message, "🚫 Comprovante Rejeitado.")
-            return
-
-        # --- LÓGICA DE APROVAÇÃO (USANDO HTML PARA EVITAR ERRO 400) ---
-        cmd_type = command.split('_')[1] 
-        p_key = f"p_{cmd_type}"
-        
+        p_key = f"p_{cmd.split('_')[1]}"
         if p_key in PRODUCTS:
             pkg = PRODUCTS[p_key]
-            # Usamos HTML aqui porque nomes com "_" não quebram o código
-            msg_liberar = (f"✅ <b>Payment Approved!</b>\n"
-                           f"Package: {pkg['name']}\n\n"
-                           f"<b>Link:</b>\n{pkg['delivery']}")
-            
-            BOT.send_message(original_user_id, msg_liberar, parse_mode="HTML")
-            BOT.reply_to(message, f"✅ Liberado com sucesso via HTML!", parse_mode="HTML")
-        else:
-            BOT.reply_to(message, "❌ Pacote não encontrado.")
-            
+            BOT.send_message(target_id, f"✅ <b>Approved!</b>\n{pkg['name']}\n\nLink: {pkg['delivery']}", parse_mode="HTML")
+            BOT.reply_to(message, f"✅ Liberado para {target_id}")
     except Exception as e:
-        # Se ainda der erro, o bot te dirá exatamente o que é
-        BOT.reply_to(message, f"❌ Erro crítico: {str(e)}")
+        BOT.reply_to(message, f"Erro: {e}")
+
+# --- PAGAMENTO VIA STARS ---
+@BOT.callback_query_handler(func=lambda call: call.data.startswith('stars_'))
+def pay_stars(call):
+    p = PRODUCTS[call.data.replace('stars_', '')]
+    BOT.send_invoice(call.message.chat.id, p['name'], "Instant Access", call.data.replace('stars_', ''), "", "XTR", [types.LabeledPrice(p['name'], p['price'])])
+
+@BOT.pre_checkout_query_handler(func=lambda q: True)
+def checkout(q): BOT.answer_pre_checkout_query(q.id, ok=True)
+
+@BOT.message_handler(content_types=['successful_payment'])
+def got_payment(message):
+    payload = message.successful_payment.invoice_payload
+    BOT.send_message(message.chat.id, f"🎉 <b>CONFIRMED!</b>\nLink: {PRODUCTS[payload]['delivery']}", parse_mode="HTML")
+
+# --- INICIALIZAÇÃO SEGURA (EVITA ERRO 409) ---
+if __name__ == "__main__":
+    keep_alive()
+    try:
+        BOT.remove_webhook()
+        time.sleep(2)
+    except: pass
+    print("Bot Conectado com Sucesso!")
+    BOT.infinity_polling(skip_pending=True)
