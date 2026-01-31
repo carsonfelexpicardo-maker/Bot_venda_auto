@@ -136,7 +136,7 @@ def handle_receipt(message):
     except Exception as e:
         print(f"Erro admin: {e}")
 
-# --- DECISÃO DO ADMIN (APROVAR OU REJEITAR) ---
+# --- DECISÃO DO ADMIN (CORRIGIDO PARA EVITAR ERRO DE ENTIDADES) ---
 @BOT.message_handler(commands=['liberar_bronze', 'liberar_silver', 'liberar_diamond', 'rejeitar'])
 def admin_decision(message):
     if message.from_user.id != ADMIN_ID: return
@@ -152,76 +152,32 @@ def admin_decision(message):
         if match:
             original_user_id = int(match.group(1))
         else:
-            return BOT.reply_to(message, "❌ Não achei o ID na mensagem. Responda à mensagem de texto com os dados do usuário.")
+            return BOT.reply_to(message, "❌ Não achei o ID na mensagem. Responda à mensagem de texto correta.")
 
-        command = message.text.split()[0] # Pega o comando (ex: /rejeitar)
+        command = message.text.split()[0]
 
         # --- LÓGICA DE REJEIÇÃO ---
         if "/rejeitar" in command:
-            BOT.send_message(original_user_id, "❌ **Payment Rejected.**\n\nWe could not verify your payment or the amount is incorrect.\nPlease contact support if you think this is an error.", parse_mode="Markdown")
-            BOT.reply_to(message, "🚫 **Comprovante Rejeitado.** O usuário foi notificado.")
+            BOT.send_message(original_user_id, "❌ <b>Payment Rejected.</b>\n\nWe could not verify your payment. Please contact support.", parse_mode="HTML")
+            BOT.reply_to(message, "🚫 Comprovante Rejeitado.")
             return
 
-        # --- LÓGICA DE APROVAÇÃO ---
-        cmd_type = command.split('_')[1] # pega 'bronze', 'silver' etc
+        # --- LÓGICA DE APROVAÇÃO (USANDO HTML PARA EVITAR ERRO 400) ---
+        cmd_type = command.split('_')[1] 
         p_key = f"p_{cmd_type}"
         
         if p_key in PRODUCTS:
             pkg = PRODUCTS[p_key]
-            BOT.send_message(original_user_id, f"✅ **Payment Approved!**\nPackage: {pkg['name']}\n\nLink:\n{pkg['delivery']}", parse_mode="Markdown")
-            BOT.reply_to(message, f"✅ Liberado **{pkg['name']}** para ID `{original_user_id}`.", parse_mode="Markdown")
+            # Usamos HTML aqui porque nomes com "_" não quebram o código
+            msg_liberar = (f"✅ <b>Payment Approved!</b>\n"
+                           f"Package: {pkg['name']}\n\n"
+                           f"<b>Link:</b>\n{pkg['delivery']}")
+            
+            BOT.send_message(original_user_id, msg_liberar, parse_mode="HTML")
+            BOT.reply_to(message, f"✅ Liberado com sucesso via HTML!", parse_mode="HTML")
         else:
-            BOT.reply_to(message, "❌ Pacote não encontrado no sistema.")
+            BOT.reply_to(message, "❌ Pacote não encontrado.")
             
     except Exception as e:
-        BOT.reply_to(message, f"❌ Erro ao processar: {e}")
-
-# --- STARS (PAGAMENTO AUTOMÁTICO) ---
-@BOT.callback_query_handler(func=lambda call: call.data.startswith('stars_'))
-def pay_stars(call):
-    try:
-        product_key = call.data.replace('stars_', '')
-        p = PRODUCTS[product_key]
-        BOT.send_invoice(
-            chat_id=call.message.chat.id, 
-            title=p['name'], 
-            description="Instant Access", 
-            invoice_payload=product_key, 
-            provider_token="", 
-            currency="XTR", 
-            prices=[types.LabeledPrice(label=p['name'], amount=p['price'])]
-        )
-    except: pass
-
-@BOT.pre_checkout_query_handler(func=lambda query: True)
-def checkout(pre_checkout_query):
-    BOT.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
-
-@BOT.message_handler(content_types=['successful_payment'])
-def got_payment(message):
-    try:
-        payload = message.successful_payment.invoice_payload
-        if payload in PRODUCTS:
-            BOT.send_message(message.chat.id, f"🎉 **PAYMENT CONFIRMED!**\n🚀 Link: {PRODUCTS[payload]['delivery']}", parse_mode="Markdown")
-            BOT.send_message(ADMIN_ID, f"💰 **Venda Automática (Stars)!**\nPacote: {PRODUCTS[payload]['name']}\nUser: {message.from_user.first_name}")
-    except: pass
-
-# --- INICIALIZAÇÃO SEGURA ---
-if __name__ == "__main__":
-    print("Bot iniciando...")
-    keep_alive() # Inicia o servidor web Flask
-    
-    # Esta parte limpa conexões presas que causam o erro 409 Conflict
-    try:
-        BOT.remove_webhook()
-        import time
-        time.sleep(1) 
-        print("Webhook removido com sucesso.")
-    except Exception as e:
-        print(f"Erro ao remover webhook: {e}")
-
-    # O skip_pending=True ignora mensagens enviadas enquanto o bot estava offline
-    # Isso evita que o bot "exploda" tentando processar tudo de uma vez ao ligar
-    print("Bot em execução!")
-    BOT.infinity_polling(skip_pending=True)
-
+        # Se ainda der erro, o bot te dirá exatamente o que é
+        BOT.reply_to(message, f"❌ Erro crítico: {str(e)}")
